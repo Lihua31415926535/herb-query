@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>中药交互模型 - 新世纪第五版《中药学》</title>
+<link rel="stylesheet" href="css/style.css">
+<!-- CDN 加载 -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+  <!-- 加载遮罩 -->
+  <div class="loading-mask" id="loadingMask">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">🌿 药囊初启，百草待观…</div>
+  </div>
+
+  <!-- 头部 -->
+  <header class="header">
+    <h1>本草<span style="color:#c4a35a">·</span>交互<small>Interactive Chinese Herbal Materia Medica</small></h1>
+    <div class="subtitle">新世纪全国高等中医药院校规划教材 · 第五版《中药学》</div>
+    <span class="badge" id="herbCountBadge">载药待数</span>
+  </header>
+
+  <div class="app-container">
+    <div id="app"><!-- Vue 挂载 --></div>
+  </div>
+
+  <footer class="footer">
+    <p>数据来源：新世纪（第五版）《中药学》 · 高等教育出版社 / 中国中医药出版社</p>
+    <p style="margin-top:4px;opacity:0.6">仅供学习参考 · 用药请遵医嘱</p>
+  </footer>
+
+  <!-- 加载数据 -->
+  <script src="data/herbs.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // 更新药材数量徽章
+    if (window.__HERBS__) {
+      document.getElementById('herbCountBadge').textContent = '载药 ' + window.__HERBS__.length + ' 味';
+    }
+    // 隐藏加载遮罩
+    setTimeout(() => {
+      document.getElementById('loadingMask').classList.add('hidden');
+    }, 600);
+  </script>
+</body>
+</html>
