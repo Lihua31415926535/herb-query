@@ -5,6 +5,7 @@ createApp({
     const herbs = ref(window.__HERBS__ || []);
     const searchQuery = ref('');
     const activeCategory = ref('');
+    const meridianFilter = ref(''); // 新增：归经筛选
     const compareList = ref([]);
     const expandedHerb = ref(null);
     const selectedHerb = ref(null);
@@ -25,29 +26,67 @@ createApp({
       herbs.value.forEach(h => { counts[h.分类] = (counts[h.分类] || 0) + 1; });
       return counts;
     });
+    
+    // 修改：增加归经筛选
     const filteredHerbs = computed(() => {
       let list = herbs.value;
       const q = searchQuery.value.trim().toLowerCase();
       const cat = activeCategory.value;
+      const mf = meridianFilter.value;
+      
       if (cat && cat !== '全部') list = list.filter(h => h.分类 === cat);
-      if (q) list = list.filter(h => (h.药名 && h.药名.includes(q)) || (h.功效 && h.功效.toLowerCase().includes(q)) || (h.主治 && h.主治.toLowerCase().includes(q)) || (h.归经 && h.归经.includes(q)) || (h.性味 && h.性味.includes(q)));
+      if (mf) list = list.filter(h => h.归经 && h.归经.includes(mf));
+      if (q) list = list.filter(h => 
+        (h.药名 && h.药名.includes(q)) || 
+        (h.功效 && h.功效.toLowerCase().includes(q)) || 
+        (h.主治 && h.主治.toLowerCase().includes(q)) || 
+        (h.归经 && h.归经.includes(q)) || 
+        (h.性味 && h.性味.includes(q))
+      );
       return list;
     });
+    
     const statsText = computed(() => {
       const t = herbs.value.length, f = filteredHerbs.value.length;
-      if (f === t && !searchQuery.value && (!activeCategory.value||activeCategory.value==='全部')) return '共收录 '+t+' 味中药';
-      let s = '找到 '+f+' 味';
-      if (searchQuery.value) s += '（"'+searchQuery.value+'"）';
-      if (activeCategory.value&&activeCategory.value!=='全部') s += '（'+activeCategory.value+'）';
-      return s;
+      const parts = [];
+      if (meridianFilter.value) parts.push('归' + meridianFilter.value + '经');
+      if (searchQuery.value) parts.push('"' + searchQuery.value + '"');
+      if (activeCategory.value && activeCategory.value !== '全部') parts.push(activeCategory.value);
+      const suffix = parts.length ? '（' + parts.join('+') + '）' : '';
+      return '找到 ' + f + ' / ' + t + ' 味' + suffix;
     });
+    
     const herbNameList = computed(() => herbs.value.map(h => h.药名));
-    function search() { showWelcome.value = false; }
+    
+    function search() { showWelcome.value = false; meridianFilter.value = ''; }
     function selectCategory(cat) { activeCategory.value = cat==='全部'?'':cat; showWelcome.value = false; }
-    function toggleExpand(herb) {
-      if (expandedHerb.value && expandedHerb.value.药名===herb.药名) { expandedHerb.value=null; selectedHerb.value=null; nextTick(()=>renderFlavorChart(null)); }
-      else { expandedHerb.value=herb; selectedHerb.value=herb; nextTick(()=>renderFlavorChart(herb)); }
+    
+    // 新增：归经点击回调
+    function filterByMeridian(jing) {
+      meridianFilter.value = jing;
+      searchQuery.value = '';
+      activeCategory.value = '';
+      showWelcome.value = false;
     }
+    function clearMeridianFilter() {
+      meridianFilter.value = '';
+    }
+    
+    function toggleExpand(herb) {
+      if (expandedHerb.value && expandedHerb.value.药名===herb.药名) { 
+        expandedHerb.value=null; selectedHerb.value=null; 
+        nextTick(()=>renderFlavorChart(null)); 
+      } else { 
+        expandedHerb.value=herb; selectedHerb.value=herb; 
+        nextTick(()=>renderFlavorChart(herb));
+        // 滚动到药材卡片
+        setTimeout(() => {
+          const el = document.getElementById('herb-'+herb.药名);
+          if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+        }, 100);
+      }
+    }
+    
     function toggleFavorite(herb) {
       const i=favorites.value.findIndex(f=>f.药名===herb.药名);
       i>-1 ? favorites.value.splice(i,1) : favorites.value.push({药名:herb.药名,分类:herb.分类});
@@ -59,28 +98,60 @@ createApp({
     }
     function isComparing(herb) { return compareList.value.some(c=>c.药名===herb.药名); }
     function clearCompare() { compareList.value=[]; }
-    function quickQuery(n) { searchQuery.value=n; showWelcome.value=false; }
-    function selectFavorite(n) { searchQuery.value=n; showWelcome.value=false; }
+    function quickQuery(n) { searchQuery.value=n; showWelcome.value=false; meridianFilter.value=''; }
+    function selectFavorite(n) { searchQuery.value=n; showWelcome.value=false; meridianFilter.value=''; }
     function removeFavorite(n) { favorites.value=favorites.value.filter(f=>f.药名!==n); }
     const compareFields = ['药名','分类','性味','归经','功效','主治','剂量','禁忌','用法'];
+    
+    // 归经筛选的药材数量
+    const meridianHerbCount = computed(() => {
+      if (!meridianFilter.value) return 0;
+      return herbs.value.filter(h => h.归经 && h.归经.includes(meridianFilter.value)).length;
+    });
+    
+    // 图表更新
     watch(filteredHerbs, ()=>nextTick(()=>renderMeridianChart(herbs.value,filteredHerbs.value)), {deep:false});
-    onMounted(()=>{nextTick(()=>{loading.value=false;renderMeridianChart(herbs.value);renderFlavorChart(null);setTimeout(()=>renderMeridianChart(herbs.value,filteredHerbs.value),500)})});
-    return {herbs,searchQuery,activeCategory,compareList,expandedHerb,selectedHerb,showWelcome,loading,favorites,categories,categoryCounts,filteredHerbs,statsText,herbNameList,compareFields,showCharts,search,selectCategory,toggleExpand,toggleFavorite,isFavorite,toggleCompare,isComparing,clearCompare,quickQuery,selectFavorite,removeFavorite};
+    
+    onMounted(()=>{
+      // 注册归经点击回调
+      window.__onMeridianClick = (jing) => {
+        filterByMeridian(jing);
+      };
+      nextTick(()=>{
+        loading.value=false;
+        renderMeridianChart(herbs.value);
+        renderFlavorChart(null);
+        setTimeout(()=>renderMeridianChart(herbs.value,filteredHerbs.value),500);
+      });
+    });
+    
+    return {
+      herbs,searchQuery,activeCategory,meridianFilter,compareList,expandedHerb,selectedHerb,
+      showWelcome,loading,favorites,categories,categoryCounts,filteredHerbs,
+      statsText,herbNameList,compareFields,showCharts,meridianHerbCount,
+      search,selectCategory,filterByMeridian,clearMeridianFilter,
+      toggleExpand,toggleFavorite,isFavorite,toggleCompare,isComparing,
+      clearCompare,quickQuery,selectFavorite,removeFavorite
+    };
   },
   template: `<div>
 <div class="search-area">
 <div class="search-row"><div class="search-input-wrap"><span class="icon">🔍</span><input v-model="searchQuery" @input="search" placeholder="输入药名、功效、归经、性味…" autofocus/></div><button class="btn btn-primary" @click="search">查询</button></div>
 <div class="filter-bar"><span v-for="cat in categories" :key="cat" class="tag" :class="{active:activeCategory===cat||(cat==='全部'&&!activeCategory)}" @click="selectCategory(cat)">{{cat}}<span class="count" v-if="cat!=='全部'">({{categoryCounts[cat]||0}})</span></span></div>
-<div class="stats-bar" v-if="!showWelcome"><span><span class="highlight">{{filteredHerbs.length}}</span>/{{herbs.length}}味</span><span>{{statsText}}</span></div>
+<div class="stats-bar" v-if="!showWelcome">
+<span><span class="highlight">{{filteredHerbs.length}}</span>/{{herbs.length}}味</span>
+<span>{{statsText}}</span>
+<span v-if="meridianFilter" class="tag active" style="cursor:default;margin-left:8px;display:inline-flex;align-items:center;gap:4px">归{{meridianFilter}}经<button @click="clearMeridianFilter" style="background:none;border:none;color:white;cursor:pointer;font-size:12px;padding:0;margin-left:2px">✕</button></span>
+</div>
 </div>
 <div class="compare-panel" v-if="compareList.length>=2"><div class="compare-header"><h3>📊 对比模式（{{compareList.length}}味）</h3><button class="btn btn-sm btn-danger" @click="clearCompare">清除</button></div>
 <div class="compare-body"><table class="compare-table"><tr><th>字段</th><th v-for="h in compareList" :key="h.药名">{{h.药名}}</th></tr>
 <tr v-for="f in compareFields.slice(1)" :key="f"><td>{{f}}</td><td v-for="h in compareList" :key="h.药名+f">{{h[f]||'—'}}</td></tr></table></div></div>
 <div class="quick-nav" v-if="!showWelcome&&filteredHerbs.length>0"><div class="quick-nav-title">📌 快速定位</div><div class="quick-nav-items"><span class="quick-nav-item" v-for="name in herbNameList" :key="name" @click="quickQuery(name)">{{name}}</span></div></div>
 <div class="main-layout"><div class="main-content">
-<div class="welcome-area" v-if="showWelcome&&!searchQuery&&!activeCategory"><div class="icon">🌿</div><h2>中药交互模型</h2><p>输入药名开始查询 · 支持按功效、归经、性味搜索 · 收录{{herbs.length}}味中药</p></div>
-<div class="no-result" v-if="!showWelcome&&filteredHerbs.length===0"><div class="icon">🔍</div><p>未找到匹配的中药</p><p class="suggestion">试试输入药名中的任意字，或按分类浏览</p></div>
-<div v-for="herb in filteredHerbs" :key="herb.药名" class="herb-card" :class="{expanded:expandedHerb&&expandedHerb.药名===herb.药名}" @click="toggleExpand(herb)">
+<div class="welcome-area" v-if="showWelcome&&!searchQuery&&!activeCategory&&!meridianFilter"><div class="icon">🌿</div><h2>中药交互模型</h2><p>输入药名开始查询 · 支持按功效、归经、性味搜索 · 收录{{herbs.length}}味中药 · 点击归经图表可筛选</p></div>
+<div class="no-result" v-if="!showWelcome&&filteredHerbs.length===0"><div class="icon">🔍</div><p>未找到匹配的中药</p><p class="suggestion">试试其他关键词或清除筛选条件</p></div>
+<div v-for="herb in filteredHerbs" :key="herb.药名" class="herb-card" :class="{expanded:expandedHerb&&expandedHerb.药名===herb.药名}" @click="toggleExpand(herb)" :id="'herb-'+herb.药名">
 <div class="herb-card-header" @click.stop><div class="herb-name-row"><span class="herb-name">{{herb.药名}}</span><span class="herb-category-badge">{{herb.分类}}</span></div>
 <div class="herb-card-actions"><button class="compare-btn" :class="{selected:isComparing(herb)}" @click.stop="toggleCompare(herb)">{{isComparing(herb)?'✅':'📊'}}</button><button class="fav-btn" :class="{active:isFavorite(herb)}" @click.stop="toggleFavorite(herb)">{{isFavorite(herb)?'❤️':'🤍'}}</button></div></div>
 <div class="herb-summary"><span><span class="label">性味</span><span class="value">{{herb.性味}}</span></span><span><span class="label">归经</span><span class="value">{{herb.归经}}</span></span></div>
@@ -93,11 +164,11 @@ createApp({
 <div class="detail-field full-width" v-if="herb.配伍"><div class="detail-field-label">🤝 配伍</div><div class="detail-field-value">{{herb.配伍}}</div></div>
 <div class="detail-field full-width" v-if="herb.注意"><div class="detail-field-label">📝 注意</div><div class="detail-field-value">{{herb.注意}}</div></div>
 </div></div></div>
-<div class="charts-area" v-if="filteredHerbs.length>0">
+<div class="charts-area" v-if="filteredHerbs.length>0||showWelcome">
 <div class="charts-toggle" @click="showCharts=!showCharts"><span>{{showCharts?'📈 收起可视化':'📈 展开可视化'}}</span></div>
 <div v-show="showCharts" class="charts-stack">
-<div class="chart-card"><div class="chart-card-header">🧍 归经分布（点击归经可筛选）</div><div class="chart-card-body"><div id="meridianChart" style="width:100%;height:540px;"></div></div></div>
-<div class="chart-card" v-if="selectedHerb"><div class="chart-card-header">🌡️ {{selectedHerb.药名}} · 四气五味分析</div><div class="chart-card-body"><div id="flavorChart" style="width:100%;height:580px;"></div></div></div>
+<div class="chart-card"><div class="chart-card-header">🧍 归经分布 <span style="font-size:12px;font-weight:400;color:#8b7355">（点击条形图筛选药材）</span></div><div class="chart-card-body"><div id="meridianChart" style="width:100%;height:520px;"></div></div></div>
+<div class="chart-card" v-if="selectedHerb"><div class="chart-card-header">🌡️ {{selectedHerb.药名}} · 四气五味</div><div class="chart-card-body"><div id="flavorChart" style="width:100%;height:560px;"></div></div></div>
 </div></div></div>
 <div class="sidebar">
 <div class="favorites-panel"><div class="fav-panel-header"><h3>❤️ 收藏夹</h3><span class="fav-count">{{favorites.length}}味</span></div>
