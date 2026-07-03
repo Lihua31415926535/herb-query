@@ -1,4 +1,4 @@
-﻿// ========== ECharts 归经桑基图 ==========
+﻿// ========== ECharts 归经分布柱状图 ==========
 function renderMeridianChart(herbs, filtered) {
   const dom = document.getElementById('meridianChart');
   if (!dom || typeof echarts === 'undefined') return;
@@ -8,54 +8,59 @@ function renderMeridianChart(herbs, filtered) {
   
   const data = (filtered && filtered.length) ? filtered : herbs;
   if (!data.length) {
-    chart.setOption({title:{text:'暂无数据', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
+    chart.setOption({title:{text:'暂无数据', left:'center', top:'center', textStyle:{fontSize:20,color:'#8b7355'}}});
     return;
   }
   
-  const seen = new Set();
-  const nodes = [];
-  const links = [];
-  const nodeMap = {};
-  
+  // 统计每条归经的药材数
+  const counts = {};
   data.forEach(h => {
-    if (!h.归经 || seen.has(h.药名)) return;
-    seen.add(h.药名);
-    const jings = h.归经.replace(/经/g,'').split(/[、,，]/).map(s => s.trim()).filter(Boolean);
-    jings.forEach(j => {
-      if (!nodeMap['h_'+h.药名]) {
-        nodeMap['h_'+h.药名] = true;
-        nodes.push({name: h.药名, itemStyle:{color:'#8b4513'}});
-      }
-      const mName = j + '经';
-      if (!nodeMap['m_'+mName]) {
-        nodeMap['m_'+mName] = true;
-        nodes.push({name: mName, itemStyle:{color:'#c4a35a'}});
-      }
-      links.push({source: h.药名, target: mName});
+    if (!h.归经) return;
+    h.归经.replace(/经/g,'').split(/[、,，]/).map(s=>s.trim()).filter(Boolean).forEach(j => {
+      counts[j] = (counts[j]||0) + 1;
     });
   });
   
-  if (nodes.length < 4) {
-    chart.setOption({title:{text:'选择药材以查看归经关系', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
-    return;
-  }
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const mNames = sorted.map(([k]) => k + '经');
+  const mCounts = sorted.map(([,v]) => v);
   
   chart.setOption({
-    tooltip: {trigger:'item', formatter:'{b}'},
+    tooltip: {trigger:'axis', formatter:'{b}<br/>归经药材：{c} 味'},
+    grid: {left:80, right:30, top:20, bottom:30},
+    xAxis: {type:'value', axisLabel:{fontSize:13,color:'#5a2d0c'}},
+    yAxis: {
+      type:'category', data: mNames,
+      axisLabel:{fontSize:15,color:'#5a2d0c',fontWeight:'bold'},
+      axisLine:{show:false}, axisTick:{show:false}
+    },
     series: [{
-      type:'sankey', layout:'none', emphasis:{focus:'adjacency'},
-      nodeAlign:'left', nodeWidth:14, nodeGap:10,
-      data: nodes, links: links,
-      lineStyle: {color: 'gradient', curveness: 0.5, opacity: 0.3},
-      label: {fontSize: 13, color: '#5a2d0c', fontWeight: 'bold'}
+      type:'bar', data: mCounts,
+      barWidth: 22,
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0,0,1,0,[
+          {offset:0, color:'#c4a35a'}, {offset:1, color:'#8b4513'}
+        ]),
+        borderRadius: [0,4,4,0]
+      },
+      label: {show:true, position:'right', fontSize:14, fontWeight:'bold', color:'#5a2d0c'}
     }]
   }, true);
   
-  const resizeHandler = () => chart.resize();
-  window.addEventListener('resize', resizeHandler);
+  chart.on('click', (params) => {
+    // 点击归经柱子，可以触发筛选
+    if (params.name) {
+      const jing = params.name.replace('经','');
+      // 如果定义了回调则调用
+      if (window.__onMeridianClick) window.__onMeridianClick(jing);
+    }
+  });
+  
+  window.__chartResize = () => chart.resize();
+  window.addEventListener('resize', window.__chartResize);
 }
 
-// ========== ECharts 雷达图 ==========
+// ========== ECharts 性味雷达图（合二为一） ==========
 function renderFlavorChart(herb) {
   const dom = document.getElementById('flavorChart');
   if (!dom || typeof echarts === 'undefined') return;
@@ -64,53 +69,66 @@ function renderFlavorChart(herb) {
   const chart = echarts.init(dom);
   
   if (!herb || !herb.性味) {
-    chart.setOption({title:{text:'点击药材展开查看性味分析', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
+    chart.setOption({
+      title:{text:'点击任意药材展开详情', subtext:'即可查看性味雷达分析', left:'center', top:'center',
+             textStyle:{fontSize:18,color:'#8b7355'}, subtextStyle:{fontSize:14,color:'#b8a080'}}
+    });
     return;
   }
   
   const xw = herb.性味 || '';
-  const flavors = {辛:0,甘:0,酸:0,苦:0,咸:0,淡:0,涩:0};
-  const props = {寒:0,热:0,温:0,凉:0,平:0};
+  const indicators = [
+    {name:'辛', max:5}, {name:'甘', max:5}, {name:'酸', max:5},
+    {name:'苦', max:5}, {name:'咸', max:5}, {name:'淡', max:3},
+    {name:'涩', max:3}, {name:'寒', max:8}, {name:'热', max:8},
+    {name:'温', max:8}, {name:'凉', max:8}, {name:'平', max:8}
+  ];
+  const values = [
+    xw.includes('辛')?5:0, xw.includes('甘')?5:0, xw.includes('酸')?5:0,
+    xw.includes('苦')?5:0, xw.includes('咸')?5:0, xw.includes('淡')?3:0,
+    xw.includes('涩')?3:0,
+    parseProp(xw,'大寒',8,'寒',6,'微寒',4),
+    parseProp(xw,'大热',8,'热',6,null,0),
+    parseProp(xw,'大温',7,'温',5,'微温',3),
+    xw.includes('凉')?4:0,
+    (!['寒','热','温','凉'].some(p => xw.includes(p)) || xw.includes('平')) ? 3 : 0
+  ];
   
-  if (xw.includes('辛')) flavors['辛'] = 5;
-  if (xw.includes('甘')) flavors['甘'] = 5;
-  if (xw.includes('酸')) flavors['酸'] = 5;
-  if (xw.includes('苦')) flavors['苦'] = 5;
-  if (xw.includes('咸')) flavors['咸'] = 5;
-  if (xw.includes('淡')) flavors['淡'] = 3;
-  if (xw.includes('涩')) flavors['涩'] = 3;
+  function parseProp(str, hk, hv, mk, mv, lk, lv) {
+    if (str.includes(hk)) return hv;
+    if (str.includes(lk || '___')) return lv || 0;
+    if (str.includes(mk)) return mv;
+    return 0;
+  }
   
-  if (xw.includes('大寒')) props['寒'] = 8;
-  else if (xw.includes('寒')) props['寒'] = xw.includes('微寒') ? 4 : 6;
-  if (xw.includes('大热')) props['热'] = 8;
-  else if (xw.includes('热')) props['热'] = 6;
-  if (xw.includes('大温')) props['温'] = 7;
-  else if (xw.includes('温')) props['温'] = xw.includes('微温') ? 3 : 5;
-  if (xw.includes('凉')) props['凉'] = 4;
-  if (xw.includes('平')) props['平'] = 3;
-  if (!Object.values(props).some(v=>v>0)) props['平'] = 3;
+  // 过滤掉值为0的指标
+  const active = indicators.map((ind, i) => ({...ind, value: values[i]})).filter(item => item.value > 0);
   
-  const fArr = Object.entries(flavors).filter(([,v])=>v>0).map(([k,v])=>({name:k, max:5, value:v}));
-  const pArr = Object.entries(props).filter(([,v])=>v>0).map(([k,v])=>({name:k, max:8, value:v}));
-  
-  if (!fArr.length && !pArr.length) {
-    chart.setOption({title:{text:'暂无性味数据', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
+  if (!active.length) {
+    chart.setOption({title:{text:'暂无性味数据', left:'center', top:'center', textStyle:{fontSize:18,color:'#8b7355'}}});
     return;
   }
   
   chart.setOption({
-    title: {text: herb.药名 + ' · 四气五味', left:'center', textStyle:{fontSize:16,color:'#5a2d0c'}},
+    title: {text: herb.药名 + ' · 四气五味雷达图', subtext: herb.性味, left:'center',
+            textStyle:{fontSize:18,color:'#5a2d0c'}, subtextStyle:{fontSize:15,color:'#8b7355',fontWeight:'bold'}},
     tooltip: {},
-    radar: [
-      {indicator: fArr, center:['25%','55%'], radius:'55%', name:{textStyle:{color:'#5a2d0c',fontSize:14,fontWeight:'bold'}}},
-      {indicator: pArr, center:['75%','55%'], radius:'55%', name:{textStyle:{color:'#5a2d0c',fontSize:14,fontWeight:'bold'}}}
-    ],
-    series: [
-      {type:'radar', data:[{value:fArr.map(f=>f.value), name:'五味', areaStyle:{color:'rgba(139,69,19,0.25)'}, lineStyle:{color:'#8b4513',width:2.5}, itemStyle:{color:'#8b4513'}}]},
-      {type:'radar', radarIndex:1, data:[{value:pArr.map(p=>p.value), name:'四气', areaStyle:{color:'rgba(196,163,90,0.25)'}, lineStyle:{color:'#c4a35a',width:2.5}, itemStyle:{color:'#c4a35a'}}]}
-    ]
+    radar: {
+      indicator: active.map(a => ({name: a.name + '\n' + a.value, max: a.max})),
+      center:['50%','55%'], radius:'65%',
+      name: {textStyle:{fontSize:16,color:'#5a2d0c',fontWeight:'bold',lineHeight:28}}
+    },
+    series: [{
+      type:'radar',
+      data: [{
+        value: active.map(a => a.value),
+        areaStyle: {color:'rgba(139,69,19,0.2)'},
+        lineStyle: {color:'#8b4513',width:3},
+        itemStyle: {color:'#8b4513'}
+      }]
+    }]
   }, true);
   
-  const resizeHandler = () => chart.resize();
-  window.addEventListener('resize', resizeHandler);
+  window.__chartResize = () => chart.resize();
+  window.addEventListener('resize', window.__chartResize);
 }
