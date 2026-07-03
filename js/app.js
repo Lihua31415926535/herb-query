@@ -3,7 +3,6 @@ const {createApp, ref, computed, watch, onMounted, nextTick} = Vue;
 
 createApp({
   setup() {
-    // 状态
     const herbs = ref(window.__HERBS__ || []);
     const searchQuery = ref('');
     const activeCategory = ref('');
@@ -12,37 +11,28 @@ createApp({
     const selectedHerb = ref(null);
     const showWelcome = ref(true);
     const loading = ref(true);
+    const showCharts = ref(true);
     
-    // 收藏 - localStorage持久化
     const favorites = ref(JSON.parse(localStorage.getItem('herb_favorites') || '[]'));
     watch(favorites, (v) => { localStorage.setItem('herb_favorites', JSON.stringify(v)); }, {deep: true});
     
-    // 分类列表
     const categories = computed(() => {
       const cats = new Set();
       herbs.value.forEach(h => { if (h.分类) cats.add(h.分类); });
       return ['全部', ...Array.from(cats)];
     });
     
-    // 分类计数
     const categoryCounts = computed(() => {
       const counts = {};
-      herbs.value.forEach(h => {
-        const c = h.分类 || '其他';
-        counts[c] = (counts[c] || 0) + 1;
-      });
+      herbs.value.forEach(h => { counts[h.分类] = (counts[h.分类] || 0) + 1; });
       return counts;
     });
     
-    // 过滤后的药材
     const filteredHerbs = computed(() => {
       let list = herbs.value;
       const q = searchQuery.value.trim().toLowerCase();
       const cat = activeCategory.value;
-      
-      if (cat && cat !== '全部') {
-        list = list.filter(h => h.分类 === cat);
-      }
+      if (cat && cat !== '全部') list = list.filter(h => h.分类 === cat);
       if (q) {
         list = list.filter(h => {
           return (h.药名 && h.药名.includes(q)) ||
@@ -55,7 +45,6 @@ createApp({
       return list;
     });
     
-    // 搜索统计
     const statsText = computed(() => {
       const total = herbs.value.length;
       const filtered = filteredHerbs.value.length;
@@ -63,90 +52,50 @@ createApp({
         return `共收录 ${total} 味中药`;
       }
       let text = `找到 ${filtered} 味`;
-      if (searchQuery.value) text += `（关键词："${searchQuery.value}"）`;
+      if (searchQuery.value) text += `（"${searchQuery.value}"）`;
       if (activeCategory.value && activeCategory.value !== '全部') text += `（${activeCategory.value}）`;
       return text;
     });
     
-    // 按拼音首字母分组（用于快速定位）
-    const herbNameList = computed(() => {
-      return herbs.value.map(h => h.药名);
-    });
+    const herbNameList = computed(() => herbs.value.map(h => h.药名));
     
-    // 方法
-    function search() {
-      showWelcome.value = false;
-    }
-    
-    function selectCategory(cat) {
-      activeCategory.value = cat === '全部' ? '' : cat;
-      showWelcome.value = false;
-    }
+    function search() { showWelcome.value = false; }
+    function selectCategory(cat) { activeCategory.value = cat === '全部' ? '' : cat; showWelcome.value = false; }
     
     function toggleExpand(herb) {
       if (expandedHerb.value && expandedHerb.value.药名 === herb.药名) {
-        expandedHerb.value = null;
-        selectedHerb.value = null;
-        renderFlavorChart(null);
+        expandedHerb.value = null; selectedHerb.value = null;
+        nextTick(() => renderFlavorChart(null));
       } else {
-        expandedHerb.value = herb;
-        selectedHerb.value = herb;
+        expandedHerb.value = herb; selectedHerb.value = herb;
         nextTick(() => renderFlavorChart(herb));
       }
     }
     
     function toggleFavorite(herb) {
       const idx = favorites.value.findIndex(f => f.药名 === herb.药名);
-      if (idx > -1) {
-        favorites.value.splice(idx, 1);
-      } else {
-        favorites.value.push({药名: herb.药名, 分类: herb.分类});
-      }
+      if (idx > -1) favorites.value.splice(idx, 1);
+      else favorites.value.push({药名: herb.药名, 分类: herb.分类});
     }
-    
-    function isFavorite(herb) {
-      return favorites.value.some(f => f.药名 === herb.药名);
-    }
+    function isFavorite(herb) { return favorites.value.some(f => f.药名 === herb.药名); }
     
     function toggleCompare(herb) {
       const idx = compareList.value.findIndex(c => c.药名 === herb.药名);
-      if (idx > -1) {
-        compareList.value.splice(idx, 1);
-      } else if (compareList.value.length < 4) {
-        compareList.value.push(herb);
-      }
+      if (idx > -1) compareList.value.splice(idx, 1);
+      else if (compareList.value.length < 4) compareList.value.push(herb);
     }
-    
-    function isComparing(herb) {
-      return compareList.value.some(c => c.药名 === herb.药名);
-    }
-    
+    function isComparing(herb) { return compareList.value.some(c => c.药名 === herb.药名); }
     function clearCompare() { compareList.value = []; }
     
-    function quickQuery(name) {
-      searchQuery.value = name;
-      showWelcome.value = false;
-    }
+    function quickQuery(name) { searchQuery.value = name; showWelcome.value = false; }
+    function selectFavorite(herbName) { searchQuery.value = herbName; showWelcome.value = false; }
+    function removeFavorite(name) { favorites.value = favorites.value.filter(f => f.药名 !== name); }
     
-    function selectFavorite(herbName) {
-      searchQuery.value = herbName;
-      showWelcome.value = false;
-    }
-    
-    function removeFavorite(name) {
-      favorites.value = favorites.value.filter(f => f.药名 !== name);
-    }
-    
-    // 对比字段列表
     const compareFields = ['药名', '分类', '性味', '归经', '功效', '主治', '剂量', '禁忌', '用法'];
     
-    // 更新归经图
     function updateMeridianChart() {
-      nextTick(() => {
-        renderMeridianChart(herbs.value, filteredHerbs.value);
-      });
+      nextTick(() => { renderMeridianChart(herbs.value, filteredHerbs.value); });
     }
-    
     watch(filteredHerbs, () => { updateMeridianChart(); }, {deep: false});
     
     onMounted(() => {
@@ -154,13 +103,17 @@ createApp({
         loading.value = false;
         renderMeridianChart(herbs.value);
         renderFlavorChart(null);
+        // 延迟重绘确保布局稳定
+        setTimeout(() => {
+          renderMeridianChart(herbs.value, filteredHerbs.value);
+        }, 500);
       });
     });
     
     return {
       herbs, searchQuery, activeCategory, compareList, expandedHerb, selectedHerb,
       showWelcome, loading, favorites, categories, categoryCounts, filteredHerbs,
-      statsText, herbNameList, compareFields,
+      statsText, herbNameList, compareFields, showCharts,
       search, selectCategory, toggleExpand, toggleFavorite, isFavorite,
       toggleCompare, isComparing, clearCompare, quickQuery, selectFavorite, removeFavorite
     };
@@ -176,7 +129,6 @@ createApp({
           </div>
           <button class="btn btn-primary" @click="search">查询</button>
         </div>
-        <!-- 分类标签 -->
         <div class="filter-bar">
           <span v-for="cat in categories" :key="cat"
                 class="tag" :class="{active: activeCategory === cat || (cat==='全部' && !activeCategory)}"
@@ -215,8 +167,9 @@ createApp({
         </div>
       </div>
 
-      <!-- 主内容区 -->
+      <!-- 双栏布局 -->
       <div class="main-layout">
+        <!-- 主内容区 -->
         <div class="main-content">
           <!-- 欢迎页 -->
           <div class="welcome-area" v-if="showWelcome && !searchQuery && !activeCategory">
@@ -225,14 +178,13 @@ createApp({
             <p>输入药名开始查询 · 支持按功效、归经、性味搜索 · 收录 {{herbs.length}} 味中药</p>
           </div>
 
-          <!-- 无结果 -->
           <div class="no-result" v-if="!showWelcome && filteredHerbs.length === 0">
             <div class="icon">🔍</div>
             <p>未找到匹配的中药</p>
             <p class="suggestion">试试输入药名中的任意字，或按分类浏览</p>
           </div>
 
-          <!-- 药材卡片列表 -->
+          <!-- 药材卡片 -->
           <div v-for="herb in filteredHerbs" :key="herb.药名" class="herb-card"
                :class="{expanded: expandedHerb && expandedHerb.药名 === herb.药名}"
                @click="toggleExpand(herb)">
@@ -243,11 +195,11 @@ createApp({
               </div>
               <div class="herb-card-actions">
                 <button class="compare-btn" :class="{selected: isComparing(herb)}"
-                        @click.stop="toggleCompare(herb)" :title="isComparing(herb)?'取消对比':'加入对比'">
+                        @click.stop="toggleCompare(herb)">
                   {{isComparing(herb) ? '✅' : '📊'}}
                 </button>
                 <button class="fav-btn" :class="{active: isFavorite(herb)}"
-                        @click.stop="toggleFavorite(herb)" :title="isFavorite(herb)?'取消收藏':'收藏'">
+                        @click.stop="toggleFavorite(herb)">
                   {{isFavorite(herb) ? '❤️' : '🤍'}}
                 </button>
               </div>
@@ -259,8 +211,6 @@ createApp({
             <div class="herb-summary" style="margin-top:4px">
               <span><span class="label">功效</span><span class="value">{{herb.功效}}</span></span>
             </div>
-
-            <!-- 展开详情 -->
             <div class="herb-detail" v-if="expandedHerb && expandedHerb.药名 === herb.药名">
               <div class="detail-grid">
                 <div class="detail-field"><div class="detail-field-label">📖 主治</div><div class="detail-field-value">{{herb.主治}}</div></div>
@@ -272,11 +222,33 @@ createApp({
               </div>
             </div>
           </div>
+
+          <!-- ======== 图表区（放主内容下方，更宽） ======== -->
+          <div class="charts-area" v-if="filteredHerbs.length > 0">
+            <div class="charts-toggle" @click="showCharts = !showCharts">
+              <span>{{ showCharts ? '📈 收起可视化' : '📈 展开可视化' }}</span>
+            </div>
+            <div v-show="showCharts" class="charts-grid">
+              <!-- 归经桑基图 -->
+              <div class="chart-card">
+                <div class="chart-card-header">🧍 归经关系图</div>
+                <div class="chart-card-body">
+                  <div id="meridianChart" style="width:100%;height:420px;"></div>
+                </div>
+              </div>
+              <!-- 性味雷达图 -->
+              <div class="chart-card" v-if="selectedHerb">
+                <div class="chart-card-header">🌡️ {{selectedHerb.药名}} · 性味分析</div>
+                <div class="chart-card-body">
+                  <div id="flavorChart" style="width:100%;height:420px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- 侧栏：收藏 + 图表 -->
+        <!-- 侧栏：收藏夹 -->
         <div class="sidebar">
-          <!-- 收藏面板 -->
           <div class="favorites-panel">
             <div class="fav-panel-header">
               <h3>❤️ 收藏夹</h3>
@@ -293,26 +265,11 @@ createApp({
               </div>
             </div>
           </div>
-
-          <!-- 归经图 -->
-          <div class="chart-section" style="margin-top:16px">
-            <div class="chart-header"><h3>🧍 归经关系图</h3></div>
-            <div class="chart-body"><div id="meridianChart"></div></div>
-          </div>
-
-          <!-- 雷达图 -->
-          <div class="chart-section" style="margin-top:16px">
-            <div class="chart-header"><h3>🌡️ 性味分析</h3></div>
-            <div class="chart-body"><div id="flavorChart"></div></div>
-          </div>
         </div>
       </div>
 
       <!-- 智能体预留 -->
-      <button class="ai-agent-fab" title="AI 智能助手（即将上线）">
-        🤖
-        <span class="coming-soon">即将上线</span>
-      </button>
+      <button class="ai-agent-fab" title="AI 智能助手（即将上线）">🤖</button>
     </div>
   `
 }).mount('#app');

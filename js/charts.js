@@ -3,35 +3,32 @@ function renderMeridianChart(herbs, filtered) {
   const dom = document.getElementById('meridianChart');
   if (!dom || typeof echarts === 'undefined') return;
   
-  // 销毁旧实例再重建，避免残留
-  echarts.dispose(dom);
+  try { echarts.dispose(dom); } catch(e) {}
   const chart = echarts.init(dom);
   
   const data = (filtered && filtered.length) ? filtered : herbs;
   if (!data.length) {
-    chart.setOption({title: {text: '暂无数据', left: 'center', top: 'center', textStyle: {fontSize:14,color:'#8b7355'}}});
+    chart.setOption({title:{text:'暂无数据', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
     return;
   }
   
   const seen = new Set();
-  const nodeMap = {};
   const nodes = [];
   const links = [];
-  const meridianCounts = {};
+  const nodeMap = {};
   
   data.forEach(h => {
     if (!h.归经 || seen.has(h.药名)) return;
     seen.add(h.药名);
     const jings = h.归经.replace(/经/g,'').split(/[、,，]/).map(s => s.trim()).filter(Boolean);
     jings.forEach(j => {
-      meridianCounts[j] = (meridianCounts[j] || 0) + 1;
-      if (!nodeMap['h_' + h.药名]) {
-        nodeMap['h_' + h.药名] = true;
-        nodes.push({name: h.药名, itemStyle:{color:'#8b4513'}, label:{fontSize:10}});
+      if (!nodeMap['h_'+h.药名]) {
+        nodeMap['h_'+h.药名] = true;
+        nodes.push({name: h.药名, itemStyle:{color:'#8b4513'}});
       }
       const mName = j + '经';
-      if (!nodeMap['m_' + mName]) {
-        nodeMap['m_' + mName] = true;
+      if (!nodeMap['m_'+mName]) {
+        nodeMap['m_'+mName] = true;
         nodes.push({name: mName, itemStyle:{color:'#c4a35a'}});
       }
       links.push({source: h.药名, target: mName});
@@ -39,7 +36,7 @@ function renderMeridianChart(herbs, filtered) {
   });
   
   if (nodes.length < 4) {
-    chart.setOption({title: {text: '选择药材以查看归经关系', left:'center', top:'center', textStyle:{fontSize:13,color:'#8b7355'}}});
+    chart.setOption({title:{text:'选择药材以查看归经关系', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
     return;
   }
   
@@ -47,26 +44,27 @@ function renderMeridianChart(herbs, filtered) {
     tooltip: {trigger:'item', formatter:'{b}'},
     series: [{
       type:'sankey', layout:'none', emphasis:{focus:'adjacency'},
-      nodeAlign:'left', nodeWidth:10, nodeGap:8,
+      nodeAlign:'left', nodeWidth:14, nodeGap:10,
       data: nodes, links: links,
-      label: {fontSize: 10, color: '#5a2d0c'}
+      lineStyle: {color: 'gradient', curveness: 0.5, opacity: 0.3},
+      label: {fontSize: 13, color: '#5a2d0c', fontWeight: 'bold'}
     }]
   }, true);
   
-  // 窗口resize自适应
-  window.addEventListener('resize', () => chart.resize());
+  const resizeHandler = () => chart.resize();
+  window.addEventListener('resize', resizeHandler);
 }
 
-// ========== ECharts 雷达图（四气五味） ==========
+// ========== ECharts 雷达图 ==========
 function renderFlavorChart(herb) {
   const dom = document.getElementById('flavorChart');
   if (!dom || typeof echarts === 'undefined') return;
   
-  echarts.dispose(dom);
+  try { echarts.dispose(dom); } catch(e) {}
   const chart = echarts.init(dom);
   
   if (!herb || !herb.性味) {
-    chart.setOption({title:{text:'点击药材查看性味分析', left:'center', top:'center', textStyle:{fontSize:13,color:'#8b7355'}}});
+    chart.setOption({title:{text:'点击药材展开查看性味分析', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
     return;
   }
   
@@ -90,29 +88,29 @@ function renderFlavorChart(herb) {
   else if (xw.includes('温')) props['温'] = xw.includes('微温') ? 3 : 5;
   if (xw.includes('凉')) props['凉'] = 4;
   if (xw.includes('平')) props['平'] = 3;
+  if (!Object.values(props).some(v=>v>0)) props['平'] = 3;
   
-  if (!Object.values(props).some(v => v > 0)) props['平'] = 3;
-  
-  const fArr = Object.entries(flavors).filter(([,v]) => v>0).map(([k,v]) => ({name:k, max:5, value:v}));
-  const pArr = Object.entries(props).filter(([,v]) => v>0).map(([k,v]) => ({name:k, max:8, value:v}));
+  const fArr = Object.entries(flavors).filter(([,v])=>v>0).map(([k,v])=>({name:k, max:5, value:v}));
+  const pArr = Object.entries(props).filter(([,v])=>v>0).map(([k,v])=>({name:k, max:8, value:v}));
   
   if (!fArr.length && !pArr.length) {
-    chart.setOption({title:{text:'暂无性味数据', left:'center', top:'center', textStyle:{fontSize:13,color:'#8b7355'}}});
+    chart.setOption({title:{text:'暂无性味数据', left:'center', top:'center', textStyle:{fontSize:16,color:'#8b7355'}}});
     return;
   }
   
   chart.setOption({
-    title: {text: herb.药名 + '·性味', left:'center', textStyle:{fontSize:13,color:'#5a2d0c'}},
+    title: {text: herb.药名 + ' · 四气五味', left:'center', textStyle:{fontSize:16,color:'#5a2d0c'}},
     tooltip: {},
     radar: [
-      {indicator: fArr, center:['25%','55%'], radius:'50%', name:{textStyle:{color:'#5a2d0c',fontSize:11}}},
-      {indicator: pArr, center:['75%','55%'], radius:'50%', name:{textStyle:{color:'#5a2d0c',fontSize:11}}}
+      {indicator: fArr, center:['25%','55%'], radius:'55%', name:{textStyle:{color:'#5a2d0c',fontSize:14,fontWeight:'bold'}}},
+      {indicator: pArr, center:['75%','55%'], radius:'55%', name:{textStyle:{color:'#5a2d0c',fontSize:14,fontWeight:'bold'}}}
     ],
     series: [
-      {type:'radar', data:[{value:fArr.map(f=>f.value), areaStyle:{color:'rgba(139,69,19,0.2)'}, lineStyle:{color:'#8b4513',width:2}, itemStyle:{color:'#8b4513'}}]},
-      {type:'radar', radarIndex:1, data:[{value:pArr.map(p=>p.value), areaStyle:{color:'rgba(196,163,90,0.2)'}, lineStyle:{color:'#c4a35a',width:2}, itemStyle:{color:'#c4a35a'}}]}
+      {type:'radar', data:[{value:fArr.map(f=>f.value), name:'五味', areaStyle:{color:'rgba(139,69,19,0.25)'}, lineStyle:{color:'#8b4513',width:2.5}, itemStyle:{color:'#8b4513'}}]},
+      {type:'radar', radarIndex:1, data:[{value:pArr.map(p=>p.value), name:'四气', areaStyle:{color:'rgba(196,163,90,0.25)'}, lineStyle:{color:'#c4a35a',width:2.5}, itemStyle:{color:'#c4a35a'}}]}
     ]
   }, true);
   
-  window.addEventListener('resize', () => chart.resize());
+  const resizeHandler = () => chart.resize();
+  window.addEventListener('resize', resizeHandler);
 }

@@ -239,3 +239,50 @@ a:hover {color:var(--red)}
   .herb-card-header{flex-direction:column}
   .herb-card-actions{align-self:flex-end}
 }
+/* ========== 图表区（主内容区） ========== */
+.charts-area {
+  margin-top: 24px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+.charts-toggle {
+  padding: 10px 18px;
+  font-size: .82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.charts-toggle:hover { background: rgba(139,69,19,0.03); }
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.chart-card {
+  border-right: 1px solid var(--border-light);
+  padding: 16px;
+}
+.chart-card:last-child { border-right: none; }
+.chart-card-header {
+  font-size: .9rem;
+  color: var(--primary);
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-card-body { min-height: 300px; }
+
+@media(max-width:820px){
+  .charts-grid { grid-template-columns: 1fr; }
+  .chart-card { border-right: none; border-bottom: 1px solid var(--border-light); }
+  .chart-card:last-child { border-bottom: none; }
+}
