@@ -130,16 +130,16 @@ createApp({
 <div class="search-area">
 <div class="search-row"><div class="search-input-wrap"><span class="icon">🔍</span><input v-model="searchQuery" @input="search" placeholder="药名、功效、主治…" autofocus/></div><button class="btn btn-primary" @click="search">查询</button></div>
 <!-- 分类（多选） -->
-<div class="filter-bar" style="margin-top:10px"><span class="filter-label">📂</span>
+<div class="filter-bar" style="margin-top:10px">
 <span class="tag" :class="{active:!activeCategories.length}" @click="clearAllFilters" style="font-size:11px">全部</span>
 <span v-for="cat in categories" :key="cat" class="tag" :class="{active:activeCategories.includes(cat)}" @click="toggleCategory(cat)">{{cat}}<span class="count">({{categoryCounts[cat]||0}})</span></span>
 </div>
 <!-- 归经（多选） -->
-<div class="filter-bar"><span class="filter-label">🧍</span>
+<div class="filter-bar">
 <span v-for="m in ALL_MERIDIANS" :key="m" class="tag tag-sm" :class="{active:activeMeridians.includes(m)}" @click="toggleMeridian(m)">{{m}}</span>
 </div>
 <!-- 性味（多选） -->
-<div class="filter-bar" v-for="fg in ALL_FLAVORS" :key="fg.g"><span class="filter-label">{{fg.g==='五味'?'🌡️':' '}}</span>
+<div class="filter-bar" v-for="fg in ALL_FLAVORS" :key="fg.g"><span class="filter-label" style="display:none">{{fg.g==='五味'?'🌡️':' '}}</span>
 <span v-for="f in fg.items" :key="f" class="tag tag-sm" :class="{active:activeFlavors.includes(f)}" @click="toggleFlavor(f)">{{f}}</span>
 </div>
 <!-- 统计与激活标签 -->
@@ -187,4 +187,5 @@ createApp({
 </div></div>
 <button class="ai-agent-fab">🤖</button></div>`
 }).mount('#app');
+
 
