@@ -136,11 +136,11 @@ createApp({
 </div>
 <!-- 归经（多选） -->
 <div class="filter-bar">
-<span v-for="m in ALL_MERIDIANS" :key="m" class="tag tag-sm" :class="{active:activeMeridians.includes(m)}" @click="toggleMeridian(m)">{{m}}</span>
+<span v-for="m in ALL_MERIDIANS" :key="m" class="tag" :class="{active:activeMeridians.includes(m)}" @click="toggleMeridian(m)">{{m}}</span>
 </div>
 <!-- 性味（多选） -->
 <div class="filter-bar" v-for="fg in ALL_FLAVORS" :key="fg.g"><span class="filter-label" style="display:none">{{fg.g==='五味'?'🌡️':' '}}</span>
-<span v-for="f in fg.items" :key="f" class="tag tag-sm" :class="{active:activeFlavors.includes(f)}" @click="toggleFlavor(f)">{{f}}</span>
+<span v-for="f in fg.items" :key="f" class="tag" :class="{active:activeFlavors.includes(f)}" @click="toggleFlavor(f)">{{f}}</span>
 </div>
 <!-- 统计与激活标签 -->
 <div class="stats-bar" v-if="hasFilters">
@@ -187,5 +187,6 @@ createApp({
 </div></div>
 <button class="ai-agent-fab">🤖</button></div>`
 }).mount('#app');
+
 
 
