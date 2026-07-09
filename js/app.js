@@ -138,10 +138,12 @@ createApp({
 <div class="charts-area" v-if="!hasFilters||totalFiltered"><div class="charts-toggle" @click="showCharts=!showCharts"><span>{{showCharts?'📈 收起':'📈 展开'}}可视化</span></div>
 <div v-show="showCharts" class="charts-stack">
 <div class="chart-card"><div class="chart-card-header">🧍 归经分布 <span style="font-size:12px;font-weight:400;color:#8b7355">（点击条形图切换筛选）</span></div><div class="chart-card-body"><div id="meridianChart" style="width:100%;height:500px"></div></div></div>
-<div class="chart-card" v-if="selectedHerb"><div class="chart-card-header">🌡️ {{selectedHerb.药名}} · 四气五味</div><div class="chart-card-body"><div id="flavorChart" style="width:100%;height:540px"></div></div></div>
+<div class="chart-card" v-if="selectedHerb"><div class="chart-card-header">🌡️ {{selectedHerb.药名}} · 四气五味</div><div class="chart-card-body"><div id="flavorChart" style="width:100%;height:600px"></div></div></div>
 </div></div></div>
 <div class="sidebar"><div class="favorites-panel"><div class="fav-panel-header"><h3>❤️ 收藏</h3><span class="fav-count">{{favorites.length}}</span></div>
 <div class="fav-list"><div v-if="!favorites.length" class="fav-empty">点 🤍 收藏</div>
 <div v-for="fav in favorites" :key="fav.药名" class="fav-item" @click="selectFavorite(fav.药名)"><div><div class="fav-item-name">{{fav.药名}}</div><div class="fav-item-cat">{{fav.分类}}</div></div><button class="fav-remove" @click.stop="removeFavorite(fav.药名)">✕</button></div></div></div></div></div>
 <button class="ai-agent-fab">🤖</button></div>`
 }).mount('#app');
+
+
